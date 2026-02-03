@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -20,7 +21,7 @@ type response struct {
 
 func main() {
 	http.HandleFunc("/verify", verifyHandler)
-	log.Println("server listening on :8080")
+	log.Println("server listening on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -47,7 +48,7 @@ func verifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, rec := range records {
 		if strings.HasPrefix(strings.ToLower(rec), "v=dmarc1") {
-			p := parsePolicy(rec)
+			p := parsePolicy(rec) // retrieving Dmarc type
 			writeJSON(w, response{DmarcRecord: rec, IsDmarc: true, DmarcType: p})
 			return
 		}
@@ -64,11 +65,30 @@ func extractDomain(email string) string {
 	return strings.TrimSpace(parts[1])
 }
 
+// parsePolicy parses a raw DMARC TXT record and returns the DMARC policy value.
+//
+// The function expects the full TXT record string for a DNS name like
+// `_dmarc.example.com` (for example: "v=DMARC1; p=reject; rua=mailto:admin@example.com").
+// It tokenizes the record on ';', trims whitespace, and searches for a tag
+// named "p" (case-insensitive). When found, the policy value is lowercased
+// and normalized to the known values "none", "quarantine", or "reject" when
+// applicable. If the policy value is not one of the three common options the
+// raw lowercased value is returned to preserve the tag's content.
+//
+// If no "p" tag is present, the function returns "none" as a safe default.
+// Note: this is a lightweight parser intended for simple extraction of the
+// policy tag only — it does not perform full DMARC syntax validation or parse
+// other tags such as "sp", "pct" or reporting URIs.
+//
+// Examples:
+//   parsePolicy("v=DMARC1; p=quarantine; rua=mailto:x@example.com") => "quarantine"
+//   parsePolicy("v=dmarc1; P=REJECT") => "reject"
+//   parsePolicy("v=dmarc1") => "none"
 func parsePolicy(rec string) string {
-	// rec like: "v=DMARC1; p=quarantine; rua=..."
 	parts := strings.Split(rec, ";")
 	for _, p := range parts {
 		kv := strings.SplitN(strings.TrimSpace(p), "=", 2)
+		fmt.Println(kv)
 		if len(kv) == 2 && strings.ToLower(kv[0]) == "p" {
 			val := strings.ToLower(strings.TrimSpace(kv[1]))
 			switch val {
