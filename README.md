@@ -46,3 +46,7 @@ Response JSON examples:
   "dmarcType": "none"
 }
 ```
+
+### Detailed documentation
+
+if you are interested to understand the project more deeply, do check out the technical documentation on the deepwiki page of our project [here](https://deepwiki.com/Gitax18/email-verifier)
